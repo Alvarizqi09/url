@@ -15,7 +15,6 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { user } = UrlState();
 
-  // Don't pass user?.id directly to useFetch, use null initially
   const { data: urls, error, loading, fn: fnUrls } = useFetch(getUrls);
 
   const {
@@ -24,7 +23,6 @@ const Dashboard = () => {
     fn: fnClicks,
   } = useFetch(getClicksForUrls);
 
-  // Only call fnUrls when user is available
   useEffect(() => {
     if (user?.id) {
       fnUrls(user.id);
@@ -41,7 +39,6 @@ const Dashboard = () => {
     url.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Show loading if user is not loaded yet
   if (!user) {
     return <BarLoader width={"100%"} color="#36D7B7" />;
   }

@@ -1,12 +1,14 @@
+// LocationStats.jsx
 import React from "react";
 import {
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 
 export default function LocationStats({ stats }) {
@@ -19,21 +21,25 @@ export default function LocationStats({ stats }) {
     return acc;
   }, {});
 
-  const cities = Object.entries(cityCount).map(([city, count]) => ({
-    city,
-    count,
-  }));
+  const cities = Object.entries(cityCount)
+    .map(([city, count]) => ({ city, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   return (
-    <div style={{ width: "100%", height: 300 }}>
-      <ResponsiveContainer>
-        <LineChart width={700} height={300} data={cities.slice(0, 5)}>
+    <div className="w-full h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={cities}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="city" />
           <YAxis />
-          <Tooltip labelStyle={{ color: "green" }} />
+          <Tooltip />
           <Legend />
-          <Line type="monotone" dataKey="count" stroke="#8884d8" />
-        </LineChart>
+          <Bar dataKey="count" fill="#8884d8" name="Clicks" />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );

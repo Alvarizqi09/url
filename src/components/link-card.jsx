@@ -65,7 +65,7 @@ const LinkCard = ({ url, fetchUrls }) => {
 
     try {
       await fnDelete(url.id);
-      await fetchUrls(); // Refresh data setelah delete berhasil
+      await fetchUrls();
       toast.success("Link deleted successfully!", {
         position: "top-right",
         autoClose: 2000,

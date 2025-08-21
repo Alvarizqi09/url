@@ -1,7 +1,7 @@
 import supabase, { supabaseUrl } from "./supabase";
 
 export async function login(email, password) {
-  console.log("Email:", email, "Password:", password); // Add a console log to check input
+  console.log("Email:", email, "Password:", password);
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,

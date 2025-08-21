@@ -21,6 +21,8 @@ export default function DeviceStats({ stats }) {
   }, {});
 
   const result = Object.entries(deviceCount).map(([device, count]) => ({
+    name: device,
+    value: count,
     device: device,
     count: count,
   }));
@@ -35,9 +37,9 @@ export default function DeviceStats({ stats }) {
             cy="50%"
             outerRadius={80}
             fill="#8884d8"
-            dataKey="count"
-            label={({ device, percent }) =>
-              `${device} (${(percent * 100).toFixed(0)}%)`
+            dataKey="value" // Ubah dari 'count' ke 'value'
+            label={({ name, percent }) =>
+              `${name} (${(percent * 100).toFixed(0)}%)`
             }
             labelLine={false}
           >
@@ -48,8 +50,8 @@ export default function DeviceStats({ stats }) {
               />
             ))}
           </Pie>
-          <Tooltip />
-          <Legend />
+          <Tooltip formatter={(value, name) => [value, name]} />
+          <Legend formatter={(value) => value} />
         </PieChart>
       </ResponsiveContainer>
     </div>

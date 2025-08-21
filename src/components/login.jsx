@@ -55,7 +55,6 @@ const Login = () => {
       });
       await schema.validate(formdata, { abortEarly: false });
 
-      // Here, pass formdata.email and formdata.password to the fnLogin
       await fnLogin(formdata.email, formdata.password);
     } catch (e) {
       const newErrors = {};

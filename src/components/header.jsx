@@ -21,6 +21,65 @@ const Header = () => {
   const { user, fetchUser } = UrlState();
 
   const { loading, fn: fnLogout } = useFetch(logout);
+
+  // Function to get profile picture from different sources
+  const getProfilePicture = () => {
+    if (!user) return null;
+
+    // For Google OAuth users, avatar_url is available directly
+    if (user.user_metadata?.avatar_url) {
+      return user.user_metadata.avatar_url;
+    }
+
+    // For manual signup users, profile_pic is in user_metadata
+    if (user.user_metadata?.profile_pic) {
+      return user.user_metadata.profile_pic;
+    }
+
+    // Fallback to identities array (for OAuth providers)
+    if (user.identities && user.identities.length > 0) {
+      const identity = user.identities.find((id) => id.provider === "google");
+      if (identity && identity.identity_data?.avatar_url) {
+        return identity.identity_data.avatar_url;
+      }
+    }
+
+    return null;
+  };
+
+  // Function to get user name
+  const getUserName = () => {
+    if (!user) return "User";
+
+    // For manual signup
+    if (user.user_metadata?.name) {
+      return user.user_metadata.name;
+    }
+
+    // For Google OAuth
+    if (user.user_metadata?.full_name) {
+      return user.user_metadata.full_name;
+    }
+
+    // Fallback to email prefix
+    if (user.email) {
+      return user.email.split("@")[0];
+    }
+
+    return "User";
+  };
+
+  // Function to get initials for fallback
+  const getUserInitials = () => {
+    const name = getUserName();
+    return name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <>
       <nav className="flex items-center justify-between py-4">
@@ -33,19 +92,18 @@ const Header = () => {
             <Button onClick={() => navigate("/auth")}>Login</Button>
           ) : (
             <DropdownMenu>
-              <DropdownMenuTrigger className="w-10 rounded-full overflow-hidden">
+              <DropdownMenuTrigger className="w-full rounded-full overflow-hidden">
                 <Avatar>
                   <AvatarImage
-                    src={user?.user_metadata?.profile_pic}
+                    src={getProfilePicture()}
                     className="object-cover"
+                    alt={`${getUserName()}'s profile`}
                   />
-                  <AvatarFallback>PA</AvatarFallback>
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuLabel>
-                  {user?.user_metadata?.name}
-                </DropdownMenuLabel>
+                <DropdownMenuLabel>{getUserName()}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <Link to="/dashboard" className="flex items-center">

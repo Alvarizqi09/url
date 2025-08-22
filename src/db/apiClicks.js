@@ -23,16 +23,24 @@ export const storeClicks = async ({ id, originalUrl }) => {
     const response = await fetch("https://ipapi.co/json/");
     const { city, country_name: country } = await response.json();
 
-    await supabase.from("clicks").insert({
+    const { error } = await supabase.from("clicks").insert({
       url_id: id,
       device: device,
       city: city,
       country: country,
     });
 
+    if (error) {
+      console.error("Error storing click:", error);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     window.location.href = originalUrl;
   } catch (error) {
     console.error("Error storing clicks:", error);
+
+    window.location.href = originalUrl;
   }
 };
 

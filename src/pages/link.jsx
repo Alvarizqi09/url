@@ -44,6 +44,13 @@ const Link = () => {
 
   const { loading: loadingDelete, fn: fnDelete } = useFetch(deleteUrl);
 
+  // Function to refresh stats data
+  const refreshStats = () => {
+    if (id) {
+      fnStats(id);
+    }
+  };
+
   useEffect(() => {
     if (id && user?.id) {
       fn(id, user.id);
@@ -57,6 +64,40 @@ const Link = () => {
       navigate("/dashboard");
     }
   }, [error, navigate]);
+
+  // Auto-refresh stats every 10 seconds to catch new clicks
+  useEffect(() => {
+    if (!id) return;
+
+    const interval = setInterval(() => {
+      refreshStats();
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [id]);
+
+  // Add visibility change listener to refresh stats when user returns
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && id) {
+        refreshStats();
+      }
+    };
+
+    const handleFocus = () => {
+      if (id) {
+        refreshStats();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [id]);
 
   if (!id || !user?.id) {
     return (
@@ -134,6 +175,8 @@ const Link = () => {
         pauseOnHover: true,
         draggable: true,
       });
+
+      navigate("/dashboard");
     } catch (error) {
       console.error("Delete failed:", error);
       toast.error("Failed to delete link", {
@@ -146,6 +189,7 @@ const Link = () => {
       });
     }
   };
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
       {(loading || loadingStats) && (
@@ -189,6 +233,10 @@ const Link = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-500 hover:text-blue-700 font-medium flex items-center gap-1 truncate"
+                      onClick={() => {
+                        // Refresh stats after a short delay when link is clicked
+                        setTimeout(() => refreshStats(), 2000);
+                      }}
                     >
                       https://apshort.vercel.app/{link}
                       <ExternalLink className="h-3 w-3" />
@@ -284,10 +332,15 @@ const Link = () => {
         <div className="w-full lg:w-3/5">
           <Card className="shadow-md">
             <CardHeader>
-              <CardTitle className="text-2xl font-bold">Statistics</CardTitle>
+              <CardTitle className="text-2xl font-bold">
+                Statistics
+                {loadingStats && (
+                  <BeatLoader size={8} color="#3b82f6" className="ml-2" />
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {loadingStats ? (
+              {loadingStats && !stats ? (
                 <div className="space-y-4">
                   <Skeleton className="h-32 w-full" />
                   <Skeleton className="h-32 w-full" />

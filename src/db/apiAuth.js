@@ -13,8 +13,6 @@ export async function login(email, password) {
   }
   return data;
 }
-
-// Tambahkan fungsi login dengan Google
 export async function loginWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

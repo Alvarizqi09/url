@@ -23,6 +23,18 @@ const Dashboard = () => {
     fn: fnClicks,
   } = useFetch(getClicksForUrls);
 
+  const refreshData = () => {
+    if (user?.id) {
+      fnUrls(user.id);
+    }
+  };
+
+  const refreshClicks = () => {
+    if (urls?.length) {
+      fnClicks(urls.map((url) => url.id));
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fnUrls(user.id);
@@ -34,6 +46,38 @@ const Dashboard = () => {
       fnClicks(urls.map((url) => url.id));
     }
   }, [urls?.length]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user?.id) {
+        refreshData();
+      }
+    };
+
+    const handleFocus = () => {
+      if (user?.id) {
+        refreshData();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const interval = setInterval(() => {
+      refreshClicks();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user?.id, urls?.length]);
 
   const filteredUrls = urls?.filter((url) =>
     url.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -138,7 +182,14 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 gap-4">
         {(filteredUrls || []).map((url, i) => (
-          <LinkCard key={i} url={url} fetchUrls={() => fnUrls(user.id)} />
+          <LinkCard
+            key={i}
+            url={url}
+            fetchUrls={() => {
+              fnUrls(user.id);
+              setTimeout(() => refreshClicks(), 500);
+            }}
+          />
         ))}
 
         {filteredUrls?.length === 0 && (

@@ -1,23 +1,25 @@
 import { storeClicks } from "@/db/apiClicks";
 import { getLongUrl } from "@/db/apiUrls";
 import useFetch from "@/hooks/use-fetch";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BarLoader } from "react-spinners";
 
 const Redirectlink = () => {
   const { id } = useParams();
+  const [isRedirected, setIsRedirected] = useState(false);
 
   const { loading, data, error, fn } = useFetch(getLongUrl);
-
   const { loading: loadingStats, fn: fnStats } = useFetch(storeClicks);
 
+  // Step 1: Fetch the long URL
   useEffect(() => {
     if (id) {
       fn(id);
     }
   }, [id]);
 
+  // Step 2: Store click stats and then redirect
   useEffect(() => {
     if (!loading && data && !error) {
       fnStats({
@@ -26,6 +28,18 @@ const Redirectlink = () => {
       });
     }
   }, [loading, data, error]);
+
+  // Step 3: Redirect after stats are stored
+  useEffect(() => {
+    if (!loadingStats && data && data.original_url && !isRedirected) {
+      // Give a small delay to ensure click is recorded
+      const timeout = setTimeout(() => {
+        setIsRedirected(true);
+        window.location.href = data.original_url;
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [loadingStats, data, isRedirected]);
 
   if (error) {
     return (
@@ -48,18 +62,12 @@ const Redirectlink = () => {
     );
   }
 
-  // This component shouldn't render anything after successful redirect
-  // But just in case the redirect fails, show a manual link
+  // Fallback: If redirect didn't work, show manual link
   if (data && data.original_url) {
     return (
       <div className="mt-8 text-center">
         <p>If you're not redirected automatically, click here:</p>
-        <a
-          href={data.original_url}
-          className="text-blue-600 hover:underline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href={data.original_url} className="text-blue-600 hover:underline">
           {data.original_url}
         </a>
       </div>

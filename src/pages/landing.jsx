@@ -6,7 +6,6 @@ import {
   BarChart3,
   Shield,
   Globe,
-  ChevronRight,
   Sparkles,
   CheckCircle,
 } from "lucide-react";
@@ -278,41 +277,6 @@ const LandingPage = () => {
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
-      </div>
-
-      {/* CTA Section */}
-      <div className="relative overflow-hidden border-t border-gray-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10" />
-        <div className="container relative mx-auto px-4 py-20">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="mb-6 text-3xl font-bold md:text-5xl">
-              Ready to transform your links?
-            </h2>
-            <p className="mb-10 text-xl text-gray-300">
-              Join thousands of professionals who trust our platform for their
-              link management needs.
-            </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <Button
-                onClick={() => navigate("/auth")}
-                className="group h-14 gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-10 text-lg font-semibold hover:from-blue-700 hover:to-purple-700"
-              >
-                Get Started Free
-                <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => navigate("/auth")}
-                className="h-14 rounded-xl border-gray-700 px-10 text-lg font-medium hover:bg-gray-800"
-              >
-                View Pricing
-              </Button>
-            </div>
-            <p className="mt-6 text-sm text-gray-400">
-              No credit card required • 14-day free trial • Cancel anytime
-            </p>
-          </div>
         </div>
       </div>
     </div>

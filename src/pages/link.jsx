@@ -1,103 +1,53 @@
+// src/pages/Link.jsx
 import { Button } from "@/components/ui/button";
 import { UrlState } from "@/context";
-import { getClicksForUrl } from "@/db/apiClicks";
-import { deleteUrl, getUrl } from "@/db/apiUrls";
-import useFetch from "@/hooks/use-fetch";
 import { Copy, Download, ExternalLink, LinkIcon, Trash } from "lucide-react";
 import React, { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BarLoader, BeatLoader } from "react-spinners";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LocationStats from "@/components/location-stats";
 import DeviceStats from "@/components/device-stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "react-toastify";
+import { useUrl, useDeleteUrl } from "../hooks/useUrls";
+import { useClicksForUrl } from "../hooks/useClicks";
 
 const Link = () => {
   const { id } = useParams();
   const { user } = UrlState();
   const navigate = useNavigate();
 
-  // Add validation for id and user
+  // Use React Query hooks
+  const {
+    data: url,
+    isLoading: urlLoading,
+    error: urlError,
+  } = useUrl(id, user?.id);
+
+  const { data: stats, isLoading: statsLoading } = useClicksForUrl(id);
+
+  const deleteUrlMutation = useDeleteUrl();
+
+  // Redirect if no ID or user
   useEffect(() => {
     if (!id) {
-      console.error("No ID parameter found in URL");
       navigate("/dashboard");
       return;
     }
-
     if (!user?.id) {
-      console.error("User not authenticated");
       navigate("/dashboard");
       return;
     }
   }, [id, user, navigate]);
 
-  const { loading, data: url, fn, error } = useFetch(getUrl);
-
-  const {
-    loading: loadingStats,
-    data: stats,
-    fn: fnStats,
-  } = useFetch(getClicksForUrl);
-
-  const { loading: loadingDelete, fn: fnDelete } = useFetch(deleteUrl);
-
-  // Function to refresh stats data
-  const refreshStats = () => {
-    if (id) {
-      fnStats(id);
-    }
-  };
-
+  // Redirect on error
   useEffect(() => {
-    if (id && user?.id) {
-      fn(id, user.id);
-      fnStats(id);
-    }
-  }, [id, user?.id]);
-
-  useEffect(() => {
-    if (error) {
-      console.error("Error loading URL:", error);
+    if (urlError) {
+      console.error("Error loading URL:", urlError);
       navigate("/dashboard");
     }
-  }, [error, navigate]);
-
-  // Auto-refresh stats every 10 seconds to catch new clicks
-  useEffect(() => {
-    if (!id) return;
-
-    const interval = setInterval(() => {
-      refreshStats();
-    }, 10000); // Refresh every 10 seconds
-
-    return () => clearInterval(interval);
-  }, [id]);
-
-  // Add visibility change listener to refresh stats when user returns
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && id) {
-        refreshStats();
-      }
-    };
-
-    const handleFocus = () => {
-      if (id) {
-        refreshStats();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [id]);
+  }, [urlError, navigate]);
 
   if (!id || !user?.id) {
     return (
@@ -107,18 +57,13 @@ const Link = () => {
     );
   }
 
-  let link = "";
-  if (url) {
-    link = url?.custom_url ? url?.custom_url : url.short_url;
-  }
+  const link = url?.custom_url || url?.short_url || "";
 
   const DownloadImage = () => {
-    const imageUrl = url?.qr;
-    const fileName = url?.title;
-
+    if (!url?.qr) return;
     const anchor = document.createElement("a");
-    anchor.href = imageUrl;
-    anchor.download = fileName;
+    anchor.href = url.qr;
+    anchor.download = url.title;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -126,26 +71,16 @@ const Link = () => {
 
   const handleCopy = async () => {
     try {
-      const shortUrl = `https://apshort.vercel.app/${
-        url?.custom_url ? url?.custom_url : url.short_url
-      }`;
+      const shortUrl = `https://apshort.vercel.app/${link}`;
       await navigator.clipboard.writeText(shortUrl);
       toast.success("Link copied to clipboard!", {
         position: "top-right",
         autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
       });
     } catch (error) {
       toast.error("Failed to copy link to clipboard", {
         position: "top-right",
         autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
       });
       console.error("Copy failed:", error);
     }
@@ -153,48 +88,26 @@ const Link = () => {
 
   const handleDelete = async () => {
     if (!url?.id) {
-      console.error("URL ID is missing");
       toast.error("Cannot delete: URL ID is missing", {
         position: "top-right",
         autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
       });
       return;
     }
 
     try {
-      await fnDelete(url.id);
-      toast.success("Link deleted successfully!", {
-        position: "top-right",
-        autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
-
+      await deleteUrlMutation.mutateAsync(url.id);
       navigate("/dashboard");
     } catch (error) {
       console.error("Delete failed:", error);
-      toast.error("Failed to delete link", {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
     }
   };
 
+  const isLoading = urlLoading || statsLoading;
+
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
-      {(loading || loadingStats) && (
-        <BarLoader className="mb-4 w-full" color="#3b82f6" />
-      )}
+      {isLoading && <BarLoader className="mb-4 w-full" color="#3b82f6" />}
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="w-full lg:w-2/5 flex flex-col gap-6">
@@ -206,7 +119,7 @@ const Link = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {loading ? (
+              {urlLoading ? (
                 <>
                   <Skeleton className="h-8 w-3/4" />
                   <Skeleton className="h-6 w-full" />
@@ -233,10 +146,6 @@ const Link = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-500 hover:text-blue-700 font-medium flex items-center gap-1 truncate"
-                      onClick={() => {
-                        // Refresh stats after a short delay when link is clicked
-                        setTimeout(() => refreshStats(), 2000);
-                      }}
                     >
                       https://apshort.vercel.app/{link}
                       <ExternalLink className="h-3 w-3" />
@@ -294,10 +203,10 @@ const Link = () => {
                       size="sm"
                       variant="destructive"
                       onClick={handleDelete}
-                      disabled={loadingDelete}
+                      disabled={deleteUrlMutation.isPending}
                       className="flex items-center gap-1"
                     >
-                      {loadingDelete ? (
+                      {deleteUrlMutation.isPending ? (
                         <BeatLoader size={5} color="white" />
                       ) : (
                         <>
@@ -328,25 +237,24 @@ const Link = () => {
           )}
         </div>
 
-        {/* Right Panel - Statistics */}
         <div className="w-full lg:w-3/5">
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="text-2xl font-bold">
                 Statistics
-                {loadingStats && (
+                {statsLoading && (
                   <BeatLoader size={8} color="#3b82f6" className="ml-2" />
                 )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {loadingStats && !stats ? (
+              {statsLoading && !stats ? (
                 <div className="space-y-4">
                   <Skeleton className="h-32 w-full" />
                   <Skeleton className="h-32 w-full" />
                   <Skeleton className="h-32 w-full" />
                 </div>
-              ) : stats && stats?.length ? (
+              ) : stats?.length ? (
                 <>
                   <Card>
                     <CardHeader className="py-3">
@@ -354,7 +262,7 @@ const Link = () => {
                     </CardHeader>
                     <CardContent>
                       <p className="text-3xl font-bold text-blue-600">
-                        {stats?.length || 0}
+                        {stats.length}
                       </p>
                     </CardContent>
                   </Card>

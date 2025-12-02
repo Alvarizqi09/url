@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/components/login.jsx
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,44 +13,54 @@ import { Button } from "./ui/button";
 import { BeatLoader } from "react-spinners";
 import Error from "./error";
 import * as Yup from "yup";
-import useFetch from "../hooks/use-fetch";
 import { login, loginWithGoogle } from "../db/apiAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { UrlState } from "../context";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 const Login = () => {
-  const [errors, setErrors] = useState([]);
+  const [errors, setErrors] = useState({});
   const [formdata, setFormdata] = useState({
     email: "",
     password: "",
   });
   const navigate = useNavigate();
-  let [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const longLink = searchParams.get("createNew");
+  const { fetchUser } = UrlState();
+
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }) => login(email, password),
+    onSuccess: () => {
+      fetchUser();
+      navigate(`/dashboard?${longLink ? `createNew=${longLink}` : ""}`);
+      toast.success("Login successful!");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Login failed");
+    },
+  });
+
+  const googleLoginMutation = useMutation({
+    mutationFn: () => loginWithGoogle(),
+    onSuccess: () => {
+      fetchUser();
+      navigate(`/dashboard?${longLink ? `createNew=${longLink}` : ""}`);
+    },
+    onError: (error) => {
+      console.error("Google login error:", error);
+      toast.error("Google login failed");
+    },
+  });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormdata((prevState) => ({ ...prevState, [name]: value }));
   };
 
-  const { data, loading, error, fn: fnLogin } = useFetch(login);
-  const {
-    data: googleData,
-    loading: googleLoading,
-    error: googleError,
-    fn: fnGoogleLogin,
-  } = useFetch(loginWithGoogle);
-  const { fetchUser } = UrlState();
-
-  useEffect(() => {
-    if ((error === null && data) || (googleError === null && googleData)) {
-      navigate(`/dashboard?${longLink ? `createNew=${longLink}` : ""}`);
-      fetchUser();
-    }
-  }, [data, error, googleData, googleError]);
-
   const handleLogin = async () => {
-    setErrors([]);
+    setErrors({});
     try {
       const schema = Yup.object().shape({
         email: Yup.string()
@@ -61,19 +72,24 @@ const Login = () => {
       });
       await schema.validate(formdata, { abortEarly: false });
 
-      await fnLogin(formdata.email, formdata.password);
-    } catch (e) {
-      const newErrors = {};
-      e?.inner?.forEach((err) => {
-        newErrors[err.path] = err.message;
+      await loginMutation.mutateAsync({
+        email: formdata.email,
+        password: formdata.password,
       });
-      setErrors(newErrors);
+    } catch (e) {
+      if (e?.inner) {
+        const newErrors = {};
+        e.inner.forEach((err) => {
+          newErrors[err.path] = err.message;
+        });
+        setErrors(newErrors);
+      }
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
-      await fnGoogleLogin();
+      await googleLoginMutation.mutateAsync();
     } catch (e) {
       console.error("Google login error:", e);
     }
@@ -84,8 +100,10 @@ const Login = () => {
       <CardHeader>
         <CardTitle>Login</CardTitle>
         <CardDescription>login duluu mas</CardDescription>
-        {(error || googleError) && (
-          <Error message={(error || googleError).message} />
+        {(loginMutation.error || googleLoginMutation.error) && (
+          <Error
+            message={(loginMutation.error || googleLoginMutation.error).message}
+          />
         )}
       </CardHeader>
       <CardContent className="space-y-2">
@@ -110,7 +128,11 @@ const Login = () => {
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <Button onClick={handleLogin} className="w-full">
-          {loading ? <BeatLoader size={10} color="#36d7b7" /> : "Login"}
+          {loginMutation.isPending ? (
+            <BeatLoader size={10} color="#36d7b7" />
+          ) : (
+            "Login"
+          )}
         </Button>
 
         <div className="flex items-center w-full">
@@ -124,7 +146,7 @@ const Login = () => {
           variant="outline"
           className="w-full flex items-center justify-center space-x-2"
         >
-          {googleLoading ? (
+          {googleLoginMutation.isPending ? (
             <BeatLoader size={10} color="#36d7b7" />
           ) : (
             <>

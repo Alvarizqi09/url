@@ -1,45 +1,49 @@
-import { storeClicks } from "@/db/apiClicks";
-import { getLongUrl } from "@/db/apiUrls";
-import useFetch from "@/hooks/use-fetch";
+// src/pages/Redirectlink.jsx
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BarLoader } from "react-spinners";
+import { useQuery } from "@tanstack/react-query";
+import { getLongUrl } from "@/db/apiUrls";
+import { useStoreClick } from "../hooks/useClicks";
 
 const Redirectlink = () => {
   const { id } = useParams();
   const [isRedirected, setIsRedirected] = useState(false);
 
-  const { loading, data, error, fn } = useFetch(getLongUrl);
-  const { loading: loadingStats, fn: fnStats } = useFetch(storeClicks);
+  // Fetch the long URL
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["redirect", id],
+    queryFn: () => getLongUrl(id),
+    enabled: !!id,
+    retry: 1,
+  });
 
-  // Step 1: Fetch the long URL
-  useEffect(() => {
-    if (id) {
-      fn(id);
-    }
-  }, [id]);
+  const storeClickMutation = useStoreClick();
 
-  // Step 2: Store click stats and then redirect
+  // Store click stats and redirect
   useEffect(() => {
-    if (!loading && data && !error) {
-      fnStats({
-        id: data.id,
-        originalUrl: data.original_url,
-      });
-    }
-  }, [loading, data, error]);
+    if (!isLoading && data && !error && !isRedirected) {
+      const storeAndRedirect = async () => {
+        try {
+          // Store the click
+          await storeClickMutation.mutateAsync({
+            id: data.id,
+            originalUrl: data.original_url,
+          });
+        } catch (err) {
+          console.error("Failed to store click:", err);
+        } finally {
+          // Redirect regardless of click storage success
+          setTimeout(() => {
+            setIsRedirected(true);
+            window.location.href = data.original_url;
+          }, 300);
+        }
+      };
 
-  // Step 3: Redirect after stats are stored
-  useEffect(() => {
-    if (!loadingStats && data && data.original_url && !isRedirected) {
-      // Give a small delay to ensure click is recorded
-      const timeout = setTimeout(() => {
-        setIsRedirected(true);
-        window.location.href = data.original_url;
-      }, 500);
-      return () => clearTimeout(timeout);
+      storeAndRedirect();
     }
-  }, [loadingStats, data, isRedirected]);
+  }, [isLoading, data, error, isRedirected, storeClickMutation]);
 
   if (error) {
     return (
@@ -52,7 +56,7 @@ const Redirectlink = () => {
     );
   }
 
-  if (loading || loadingStats) {
+  if (isLoading || storeClickMutation.isPending) {
     return (
       <div className="mt-8 text-center">
         <BarLoader width={"100%"} color="#36d7b7" />

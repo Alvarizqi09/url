@@ -1,127 +1,135 @@
+// src/components/link-card.jsx
 import React from "react";
 import { Link } from "react-router-dom";
+import { Copy, Download, Trash, ExternalLink } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "./ui/button";
-import { Copy, Delete, Download, Trash } from "lucide-react";
-import useFetch from "../hooks/use-fetch";
-import { deleteUrl } from "../db/apiUrls";
 import { BeatLoader } from "react-spinners";
 import { toast } from "react-toastify";
+import { useDeleteUrl } from "../hooks/useUrls";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "../hooks/queryKeys";
 
-const LinkCard = ({ url, fetchUrls }) => {
-  const DownloadImage = () => {
-    const imageUrl = url?.qr;
-    const fileName = url?.title;
-
-    const anchor = document.createElement("a");
-    anchor.href = imageUrl;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-  };
-
-  const { loading: loadingDelete, fn: fnDelete } = useFetch(deleteUrl);
+const LinkCard = ({ url }) => {
+  const deleteUrlMutation = useDeleteUrl();
+  const queryClient = useQueryClient();
 
   const handleCopy = async () => {
     try {
       const shortUrl = `https://apshort.vercel.app/${
-        url?.custom_url ? url?.custom_url : url.short_url
+        url?.custom_url || url.short_url
       }`;
       await navigator.clipboard.writeText(shortUrl);
       toast.success("Link copied to clipboard!", {
         position: "top-right",
         autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
       });
-    } catch (error) {
-      toast.error("Failed to copy link to clipboard", {
+    } catch {
+      toast.error("Failed to copy link", {
         position: "top-right",
         autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
       });
-      console.error("Copy failed:", error);
     }
   };
 
+  const downloadImage = () => {
+    if (!url?.qr) return;
+    const anchor = document.createElement("a");
+    anchor.href = url.qr;
+    anchor.download = url.title;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  };
+
   const handleDelete = async () => {
-    if (!url?.id) {
-      console.error("URL ID is missing");
-      toast.error("Cannot delete: URL ID is missing", {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
-      return;
-    }
+    if (!url?.id) return;
 
     try {
-      await fnDelete(url.id);
-      await fetchUrls();
-      toast.success("Link deleted successfully!", {
-        position: "top-right",
-        autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+      await deleteUrlMutation.mutateAsync(url.id);
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: queryKeys.urls.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clicks.all });
     } catch (error) {
       console.error("Delete failed:", error);
-      toast.error("Failed to delete link", {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
     }
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-5 border p-4 bg-gray-900 rounded-lg">
-      <img
-        src={url?.qr}
-        className="h-32 object-contain ring ring-blue-500 self-start"
-        alt={url?.title}
-      />
-      <Link to={`/link/${url?.id}`} className="flex flex-col flex-1">
-        <span className="text-3xl font-extrabold hover:underline cursor-pointer">
-          {url?.title}
-        </span>
-        <span className="text-2xl text-blue-400 font-bold hover:underline cursor-pointer">
-          https://apshort.vercel.app/
-          {url?.custom_url ? url?.custom_url : url.short_url}
-        </span>
-        <span className="flex items-center gap-1 hover:underline cursor-pointer">
-          {url?.original_url}
-        </span>
-        <span className="flex items-end font-extralight text-sm flex-1">
-          {new Date(url?.created_at).toLocaleDateString()}
-        </span>
-      </Link>
+    <Card className="hover:shadow-lg transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              {url?.qr && (
+                <img
+                  src={url.qr}
+                  alt={url.title}
+                  className="h-12 w-12 object-contain border rounded"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold truncate">{url.title}</h3>
+                <a
+                  href={`https://apshort.vercel.app/${
+                    url?.custom_url || url.short_url
+                  }`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-700 text-sm flex items-center gap-1 truncate"
+                >
+                  https://apshort.vercel.app/{url?.custom_url || url.short_url}
+                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                </a>
+                <p className="text-sm text-gray-500 truncate">
+                  {url.original_url}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Created: {new Date(url.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
 
-      <div className="flex gap-2">
-        <Button variant="ghost" onClick={handleCopy}>
-          <Copy />
-        </Button>
-        <Button variant="ghost" onClick={DownloadImage}>
-          <Download />
-        </Button>
-        <Button variant="ghost" onClick={handleDelete} disabled={loadingDelete}>
-          {loadingDelete ? <BeatLoader size={5} color="white" /> : <Trash />}
-        </Button>
-      </div>
-    </div>
+          <div className="flex items-center gap-2">
+            <Link to={`/link/${url.id}`}>
+              <Button variant="outline" size="sm">
+                View Details
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopy}
+              className="flex items-center gap-1"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={downloadImage}
+              className="flex items-center gap-1"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleteUrlMutation.isPending}
+              className="text-red-500 hover:text-red-700 flex items-center gap-1"
+            >
+              {deleteUrlMutation.isPending ? (
+                <BeatLoader size={5} color="red" />
+              ) : (
+                <Trash className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

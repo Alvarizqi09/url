@@ -13,27 +13,42 @@ import AboutUs from "./pages/about";
 import PrivacyPolicy from "./pages/privacy";
 import TermsOfService from "./pages/terms";
 import CookiePolicy from "./pages/cookie";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 function App() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
+        retry: 1,
+      },
+    },
+  });
   return (
-    <UrlProvider>
-      <AppRouter />
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
-        style={{
-          fontSize: "14px",
-        }}
-      />
-    </UrlProvider>
+    <QueryClientProvider client={queryClient}>
+      <UrlProvider>
+        <AppRouter />
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="dark"
+          style={{
+            fontSize: "14px",
+          }}
+        />
+      </UrlProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

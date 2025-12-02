@@ -1,98 +1,62 @@
-import React, { useEffect, useState } from "react";
+// src/pages/Dashboard.jsx
+import React, { useMemo, useState } from "react";
 import { BarLoader } from "react-spinners";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "../components/ui/input";
-import { Filter, Search, Plus, TrendingUp, Link2 } from "lucide-react";
+import { Filter, Search, Link2, TrendingUp } from "lucide-react";
 import Error from "../components/error";
-import useFetch from "../hooks/use-fetch";
-import { getUrls } from "../db/apiUrls";
 import { UrlState } from "../context";
-import { getClicksForUrls } from "../db/apiClicks";
 import LinkCard from "../components/link-card";
 import CreateLink from "../components/create-link";
+import { useUrls } from "../hooks/useUrls";
+import { useClicksForUrls } from "../hooks/useClicks";
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { user } = UrlState();
 
-  const { data: urls, error, loading, fn: fnUrls } = useFetch(getUrls);
-
+  // Fetch URLs using React Query
   const {
-    loading: loadingClicks,
-    data: clicks,
-    fn: fnClicks,
-  } = useFetch(getClicksForUrls);
+    data: urls,
+    error: urlsError,
+    isLoading: urlsLoading,
+  } = useUrls(user?.id);
 
-  const refreshData = () => {
-    if (user?.id) {
-      fnUrls(user.id);
-    }
-  };
+  // Get URL IDs for clicks query
+  const urlIds = useMemo(() => urls?.map((url) => url.id) || [], [urls]);
 
-  const refreshClicks = () => {
-    if (urls?.length) {
-      fnClicks(urls.map((url) => url.id));
-    }
-  };
+  // Fetch clicks using React Query
+  const { data: clicks, isLoading: clicksLoading } = useClicksForUrls(urlIds);
 
-  useEffect(() => {
-    if (user?.id) {
-      fnUrls(user.id);
-    }
-  }, [user?.id]);
+  // Filter URLs based on search
+  const filteredUrls = useMemo(() => {
+    if (!urls) return [];
+    return urls.filter((url) =>
+      url.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [urls, searchQuery]);
 
-  useEffect(() => {
-    if (urls?.length) {
-      fnClicks(urls.map((url) => url.id));
-    }
-  }, [urls?.length]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && user?.id) {
-        refreshData();
-      }
-    };
-
-    const handleFocus = () => {
-      if (user?.id) {
-        refreshData();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const interval = setInterval(() => {
-      refreshClicks();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [user?.id, urls?.length]);
-
-  const filteredUrls = urls?.filter((url) =>
-    url.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const todayClicks =
-    clicks?.filter((click) => {
+  // Calculate today's clicks
+  const todayClicks = useMemo(() => {
+    if (!clicks) return 0;
+    const today = new Date();
+    return clicks.filter((click) => {
       const clickDate = new Date(click.created_at);
-      const today = new Date();
       return clickDate.toDateString() === today.toDateString();
-    }).length || 0;
+    }).length;
+  }, [clicks]);
+
+  // Calculate average clicks per link
+  const avgClicks = useMemo(() => {
+    if (!urls?.length || !clicks?.length) return 0;
+    return Math.round(clicks.length / urls.length);
+  }, [urls, clicks]);
 
   if (!user) {
     return <BarLoader width={"100%"} color="#36D7B7" />;
   }
+
+  const isLoading = urlsLoading || clicksLoading;
 
   return (
     <div className="flex flex-col gap-8">
@@ -104,9 +68,7 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {(loading || loadingClicks) && (
-        <BarLoader width={"100%"} color="#36D7B7" />
-      )}
+      {isLoading && <BarLoader width={"100%"} color="#36D7B7" />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-700 text-white">
@@ -150,9 +112,7 @@ const Dashboard = () => {
             <TrendingUp className="h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {urls?.length ? Math.round(clicks?.length / urls.length) : 0}
-            </div>
+            <div className="text-2xl font-bold">{avgClicks}</div>
             <p className="text-xs text-orange-100">Per link</p>
           </CardContent>
         </Card>
@@ -178,21 +138,14 @@ const Dashboard = () => {
         <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
       </div>
 
-      {error && <Error message={error?.message} />}
+      {urlsError && <Error message={urlsError?.message} />}
 
       <div className="grid grid-cols-1 gap-4">
-        {(filteredUrls || []).map((url, i) => (
-          <LinkCard
-            key={i}
-            url={url}
-            fetchUrls={() => {
-              fnUrls(user.id);
-              setTimeout(() => refreshClicks(), 500);
-            }}
-          />
+        {filteredUrls.map((url) => (
+          <LinkCard key={url.id} url={url} />
         ))}
 
-        {filteredUrls?.length === 0 && (
+        {filteredUrls.length === 0 && (
           <Card className="text-center py-12">
             <CardContent>
               <div className="flex justify-center mb-4">

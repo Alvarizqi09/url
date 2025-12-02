@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/components/signup.jsx
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,13 +13,14 @@ import { Button } from "./ui/button";
 import { BeatLoader } from "react-spinners";
 import Error from "./error";
 import * as Yup from "yup";
-import useFetch from "../hooks/use-fetch";
 import { signup, loginWithGoogle } from "../db/apiAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { UrlState } from "../context";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 const SignUp = () => {
-  const [errors, setErrors] = useState([]);
+  const [errors, setErrors] = useState({});
   const [formdata, setFormdata] = useState({
     name: "",
     email: "",
@@ -26,8 +28,33 @@ const SignUp = () => {
     profile_pic: null,
   });
   const navigate = useNavigate();
-  let [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const longLink = searchParams.get("createNew");
+  const { fetchUser } = UrlState();
+
+  const signupMutation = useMutation({
+    mutationFn: (formData) => signup(formData),
+    onSuccess: () => {
+      fetchUser();
+      navigate(`/dashboard?${longLink ? `createNew=${longLink}` : ""}`);
+      toast.success("Account created successfully!");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Signup failed");
+    },
+  });
+
+  const googleSignupMutation = useMutation({
+    mutationFn: () => loginWithGoogle(),
+    onSuccess: () => {
+      fetchUser();
+      navigate(`/dashboard?${longLink ? `createNew=${longLink}` : ""}`);
+    },
+    onError: (error) => {
+      console.error("Google signup error:", error);
+      toast.error("Google signup failed");
+    },
+  });
 
   const handleInputChange = (e) => {
     const { name, value, files } = e.target;
@@ -37,24 +64,8 @@ const SignUp = () => {
     }));
   };
 
-  const { data, loading, error, fn: fnSignUp } = useFetch(signup);
-  const {
-    data: googleData,
-    loading: googleLoading,
-    error: googleError,
-    fn: fnGoogleSignUp,
-  } = useFetch(loginWithGoogle);
-  const { fetchUser } = UrlState();
-
-  useEffect(() => {
-    if ((error === null && data) || (googleError === null && googleData)) {
-      navigate(`/dashboard?${longLink ? `createNew=${longLink}` : ""}`);
-      fetchUser();
-    }
-  }, [data, error, googleData, googleError]);
-
   const handleSignUp = async () => {
-    setErrors([]);
+    setErrors({});
     try {
       const schema = Yup.object().shape({
         name: Yup.string().required("Name is required"),
@@ -68,19 +79,21 @@ const SignUp = () => {
       });
       await schema.validate(formdata, { abortEarly: false });
 
-      await fnSignUp(formdata);
+      await signupMutation.mutateAsync(formdata);
     } catch (e) {
-      const newErrors = {};
-      e?.inner?.forEach((err) => {
-        newErrors[err.path] = err.message;
-      });
-      setErrors(newErrors);
+      if (e?.inner) {
+        const newErrors = {};
+        e.inner.forEach((err) => {
+          newErrors[err.path] = err.message;
+        });
+        setErrors(newErrors);
+      }
     }
   };
 
   const handleGoogleSignUp = async () => {
     try {
-      await fnGoogleSignUp();
+      await googleSignupMutation.mutateAsync();
     } catch (e) {
       console.error("Google signup error:", e);
     }
@@ -91,8 +104,12 @@ const SignUp = () => {
       <CardHeader>
         <CardTitle>Sign Up</CardTitle>
         <CardDescription>Silakan daftar akun baru</CardDescription>
-        {(error || googleError) && (
-          <Error message={(error || googleError).message} />
+        {(signupMutation.error || googleSignupMutation.error) && (
+          <Error
+            message={
+              (signupMutation.error || googleSignupMutation.error).message
+            }
+          />
         )}
       </CardHeader>
       <CardContent className="space-y-2">
@@ -135,7 +152,11 @@ const SignUp = () => {
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <Button onClick={handleSignUp} className="w-full">
-          {loading ? <BeatLoader size={10} color="#36d7b7" /> : "Sign Up"}
+          {signupMutation.isPending ? (
+            <BeatLoader size={10} color="#36d7b7" />
+          ) : (
+            "Sign Up"
+          )}
         </Button>
 
         <div className="flex items-center w-full">
@@ -149,7 +170,7 @@ const SignUp = () => {
           variant="outline"
           className="w-full flex items-center justify-center space-x-2"
         >
-          {googleLoading ? (
+          {googleSignupMutation.isPending ? (
             <BeatLoader size={10} color="#36d7b7" />
           ) : (
             <>
